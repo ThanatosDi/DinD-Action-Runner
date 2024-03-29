@@ -1,0 +1,18 @@
+
+[tool.poetry]
+name = "dind-action-runner"
+version = "1.0.0"
+description = ""
+authors = ["ThanatosDi <yykkold55tw@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+flask-restful = "^0.3.10"
+python-dotenv = "^1.0.1"
+docker = "^7.0.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

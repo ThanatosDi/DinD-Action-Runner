@@ -1,0 +1,55 @@
+version: '3.9'
+
+volumes:
+  docker-in-docker:
+    driver: ${VOLUMES_DRIVER}
+
+services:
+  tunnel:
+    image: cloudflare/cloudflared
+    restart: unless-stopped
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run
+    depends_on:
+      - webhook
+  webhook:
+    build:
+      context: ./
+      dockerfile: docker/webhook.Dockerfile
+    restart: unless-stopped
+    environment:
+      - DOCKER_HOST=tcp://docker-in-docker:2376
+      - DOCKER_TLS_VERIFY=1
+      - DOCKER_TLS_CERTDIR=/certs
+      - DOCKER_CERT_PATH=/certs/client
+    volumes:
+      - ${APP_CODE_PATH_HOST}:${APP_CODE_PATH_CONTAINER}
+      - docker-in-docker:/certs/client
+    working_dir: /app
+    command: python webhook.py
+  workspace:
+    image: docker:26.0.0-cli-alpine3.19
+    restart: unless-stopped
+    environment:
+      - DOCKER_HOST=tcp://docker-in-docker:2376
+      - DOCKER_TLS_VERIFY=1
+      - DOCKER_TLS_CERTDIR=/certs
+      - DOCKER_CERT_PATH=/certs/client
+    volumes:
+      - ${APP_CODE_PATH_HOST}:${APP_CODE_PATH_CONTAINER}
+      - docker-in-docker:/certs/client
+    working_dir: /app
+    tty: true
+    depends_on:
+      - docker-in-docker
+  docker-in-docker:
+      image: docker:26.0.0-dind
+      environment:
+        DOCKER_TLS_SAN: DNS:docker-in-docker
+      privileged: true
+      volumes:
+        - ${APP_CODE_PATH_HOST}:${APP_CODE_PATH_CONTAINER}
+        - docker-in-docker:/certs/client
+      expose:
+        - 2375
