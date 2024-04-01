@@ -16,7 +16,7 @@ services:
   webhook:
     build:
       context: ./
-      dockerfile: docker/webhook.Dockerfile
+      dockerfile: docker/webhook/webhook.Dockerfile
     restart: unless-stopped
     environment:
       - DOCKER_HOST=tcp://docker-in-docker:2376
@@ -29,7 +29,9 @@ services:
     working_dir: /app
     command: python webhook.py
   workspace:
-    image: docker:26.0.0-cli-alpine3.19
+    build:
+      context: ./
+      dockerfile: docker/workspace/workspace.Dockerfile
     restart: unless-stopped
     environment:
       - DOCKER_HOST=tcp://docker-in-docker:2376
