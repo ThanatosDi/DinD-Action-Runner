@@ -17,6 +17,9 @@ def _parse_bool(val: Union[str, bool]) -> bool:  # pylint: disable=E1136
 
 
 class AppConfig:
+    WEBHOOK_VERIFY: bool = False
+    GITHUB_WEBHOOK_SECRET: str
+    VERIFY_SIGNATURE: str = 'sha1'
     GITHUB_ACCESS_TOKEN: str
     RUNNER_NAME_PREFIX: str
     RUNNER_WORKDIR: str
