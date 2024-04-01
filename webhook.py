@@ -12,14 +12,20 @@ webhook = Api(app)
 
 
 class ValidateSignature():
-    def preprocessing(self, request: Request) -> tuple[str, str]:
-        signature_header = request.headers['X-Hub-Signature']
+    def preprocessing(self, request: Request, signature: str) -> tuple[str, str]:
+        match(signature):
+            case 'sha1':
+                signature_header_name = 'X-Hub-Signature'
+            case 'sha256':
+                signature_header_name = 'X-Hub-Signature-256'
+        signature_header = request.headers[signature_header_name]
+        print(signature_header)
         sha_name, github_signature = signature_header.split('=')
         body = request.get_data()
         return (sha_name, github_signature, body)
 
-    def sha1(self, request: Request, secret: str):
-        sha_name, github_signature, body = self.preprocessing(request)
+    def sha1(self, request: Request, secret: str) -> bool:
+        sha_name, github_signature, body = self.preprocessing(request, 'sha1')
         if sha_name != 'sha1':
             print('ERROR: X-Hub-Signature in payload headers was not sha1=****')
             return False
@@ -31,8 +37,8 @@ class ValidateSignature():
         # See if they match
         return hmac.compare_digest(local_signature.hexdigest(), github_signature)
 
-    def sha256(self, request: Request, secret: str):
-        sha_name, github_signature, body = self.preprocessing(request)
+    def sha256(self, request: Request, secret: str) -> bool:
+        sha_name, github_signature, body = self.preprocessing(request, 'sha256')
         if sha_name != 'sha256':
             print('ERROR: X-Hub-Signature in payload headers was not sha256=****')
             return False
@@ -75,25 +81,39 @@ class DynamicRunner():
 
 
 class GithubEvent(Resource, ValidateSignature):
-    def __init__(self): ...
+    def __init__(self):
+        if Config.WEBHOOK_VERIFY and (Config.VERIFY_SIGNATURE not in ['sha1', 'sha256']):
+            raise ValueError('VERIFY_SIGNATURE must be sha1 or sha256')
 
     def get(self):
         return 'OK', 200
 
     def post(self):
         payload: dict = request.get_json()
-        if super().sha1(request, '0000') == False:
-            print('ERROR: Invalid signature')
-            return 'Invalid signature', 401
         if not payload:
             print('ERROR: No payload in request')
             return 'No payload in request', 400
+
+        if Config.WEBHOOK_VERIFY:
+            match(Config.VERIFY_SIGNATURE):
+                case 'sha1':
+                    verify = super().sha1(request, Config.GITHUB_WEBHOOK_SECRET)
+                case 'sha256':
+                    verify = super().sha256(request, Config.GITHUB_WEBHOOK_SECRET)
+                case _:
+                    raise ValueError('VERIFY_SIGNATURE must be sha1 or sha256')
+            if verify == False:
+                print('ERROR: Invalid signature')
+                return 'Invalid signature', 401
+
         if not payload.get('action') == 'queued':
-            print('ERROR: Event was not queued')
-            return 'Event was not queued', 400
+            print('ERROR: Event was not queued, still return 200 but do not things.')
+            return 'Event was not queued', 200
+
         if not payload['workflow_job'].get('labels'):
             print('ERROR: No labels in workflow_job')
             return 'No labels in workflow_job', 400
+
         labels = ','.join(payload['workflow_job']['labels'])
         DynamicRunner().create(labels)
 
