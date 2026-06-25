@@ -1,0 +1,23 @@
+.env
+.database
+.laradock
+
+__pycache__
+.pytest_cache/
+.coverage
+.venv/
+*.egg-info/
+.DS_Store
+backup/*
+!backup/.gitkeep
+
+pem/*
+!pem/.gitkeep
+settings.local.json
+
+# Local CI fixture databases (never commit real data)
+sqlite/
+
+# Local dev tooling
+.claude/
+openspec/

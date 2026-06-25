@@ -1,0 +1,74 @@
+volumes:
+  docker-in-docker:
+    driver: ${VOLUMES_DRIVER}
+  runners-work:
+    driver: ${VOLUMES_DRIVER}
+  runner-externals:
+    driver: ${VOLUMES_DRIVER}
+
+services:
+  docker-in-docker:
+      image: docker:29.4.1-dind
+      restart: unless-stopped
+      environment:
+        DOCKER_TLS_SAN: DNS:docker-in-docker
+      privileged: true
+      volumes:
+        - ${APP_CODE_PATH_HOST}:${APP_CODE_PATH_CONTAINER}
+        - docker-in-docker:/certs/client
+        - ./backup:/backup
+        - runners-work:/runners-work
+        - runner-externals:/actions-runner/externals
+      expose:
+        - 2375
+  init-externals:
+      image: ${RUNNER_BASE_IMAGE:-myoung34/github-runner}:${RUNNER_BASE_IMAGE_TAG:-ubuntu-noble}
+      restart: "no"
+      entrypoint: ["sh", "-c", "cp -a /actions-runner/externals/. /ext-out/ && echo 'Externals copied.'"]
+      volumes:
+        - runner-externals:/ext-out
+      depends_on:
+        - docker-in-docker
+  tunnel:
+    image: cloudflare/cloudflared
+    restart: unless-stopped
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --protocol http2 --no-autoupdate run
+    depends_on:
+      - webhook
+  webhook:
+    build:
+      context: ./
+      dockerfile: docker/webhook/webhook.Dockerfile
+    restart: unless-stopped
+    environment:
+      - DOCKER_HOST=tcp://docker-in-docker:2376
+      - DOCKER_TLS_VERIFY=1
+      - DOCKER_TLS_CERTDIR=/certs
+      - DOCKER_CERT_PATH=/certs/client
+    volumes:
+      - ${APP_CODE_PATH_HOST}:${APP_CODE_PATH_CONTAINER}
+      - docker-in-docker:/certs/client
+    working_dir: /app
+    command: python bot.py
+    # tty: true
+  workspace:
+    build:
+      context: ./
+      dockerfile: docker/workspace/workspace.Dockerfile
+    restart: unless-stopped
+    environment:
+      - DOCKER_HOST=tcp://docker-in-docker:2376
+      - DOCKER_TLS_VERIFY=1
+      - DOCKER_TLS_CERTDIR=/certs
+      - DOCKER_CERT_PATH=/certs/client
+    volumes:
+      - ${APP_CODE_PATH_HOST}:${APP_CODE_PATH_CONTAINER}
+      - docker-in-docker:/certs/client
+      - ./backup:/backup
+      - runners-work:/runners-work
+    working_dir: /app
+    tty: true
+    depends_on:
+      - docker-in-docker

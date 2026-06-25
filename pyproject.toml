@@ -1,0 +1,31 @@
+[project]
+name = "github-action-runner"
+version = "1.0.0"
+description = "Dynamically spawn ephemeral GitHub Actions self-hosted runners via Docker-in-Docker, driven by GitHub webhooks."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "docker>=7.1.0",
+    "flask-restful>=0.3.10",
+    "loguru>=0.7.3",
+    "pygithub>=2.8.1",
+    "pyopenssl>=25.3.0",
+    "python-dotenv>=1.2.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["app", "config", "enums"]
+
+[tool.coverage.report]
+fail_under = 90
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.14.10",
+]
